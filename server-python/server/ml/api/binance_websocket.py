@@ -1,3 +1,5 @@
+import asyncio
+
 from ml.api import utils
 import os
 from time import sleep
@@ -19,8 +21,8 @@ class BinanceAPIManager():
         self.client.API_URL = utils.get_env_variable(api_endpoint)
 
         # init and start the WebSocket
-        self.bsm = ThreadedWebsocketManager(api_key=api_key, api_secret=api_secret)
-
+        # self.bsm = ThreadedWebsocketManager(api_key=api_key, api_secret=api_secret)
+        self.bsm = None
     async def task_btcusdt_socket(self):
         client = await AsyncClient.create(self.api_key, self.api_secret)
         bm = BinanceSocketManager(client)
@@ -105,7 +107,10 @@ class BinanceAPIManager():
         df.set_index('date', inplace=True)
 
         return df
-    
+
+    def initialize_websocket(self):
+        if self.bsm is None:
+            self.bsm = ThreadedWebsocketManager(api_key=self.api_key, api_secret=self.api_secret)
     # start websocket
     def start_websocket(self):
         self.bsm.start()
@@ -119,8 +124,21 @@ class BinanceAPIManager():
         self.bsm.start_kline_socket(callback=self.handle_socket_message, symbol=symbol)
 
 
+
 # Stream real-time data from websocket
 # instance.start_websocket()
 # instance.subscribe_to_a_stream(symbol='BTCUSDT')
 # utils.countdown(10)
 # instance.stop_websocket()
+
+
+
+if __name__ == "__main__":
+    # Kiểm tra nếu đang chạy các lệnh quản lý cơ sở dữ liệu (makemigrations, migrate)
+    if "makemigrations" not in sys.argv and "migrate" not in sys.argv and "collectstatic" not in sys.argv:
+        # Kiểm tra biến môi trường để quyết định có chạy WebSocket hay không
+        if os.getenv("RUN_WEBSOCKET", "false") == "true":
+            loop = asyncio.get_event_loop()
+            manager = BinanceAPIManager(api_key="your_api_key", api_secret="your_api_secret",
+                                        api_endpoint="your_api_endpoint")
+            loop.run_until_complete(manager.task_btcusdt_socket())
